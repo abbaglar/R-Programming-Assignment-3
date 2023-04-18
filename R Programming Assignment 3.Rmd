@@ -1,0 +1,253 @@
+---
+title: "R Programming Assignment 3"
+author: "Ahmet Burhan"
+date: "2023-04-06"
+output: html_document
+---
+
+# #Part 1
+
+Question:
+Plot the 30-day mortality rates for heart attack
+
+
+Answer:
+
+```{R}
+outcome <- read.csv("outcome-of-care-measures.csv", colClasses = "character")
+
+head(outcome)
+
+names(outcome)
+
+```
+
+
+```{R}
+
+outcome[ ,11] <- as.numeric(outcome[,11])
+
+hist(outcome[ ,11])
+
+```
+
+
+
+
+# #Part 2
+
+Question:
+Finding the best hospital in a state
+Write a function called best that take two arguments: the 2-character abbreviated name of a state and an
+outcome name. The function reads the outcome-of-care-measures.csv file and returns a character vector
+with the name of the hospital that has the best (i.e. lowest) 30-day mortality for the specified outcome
+in that state. The hospital name is the name provided in the Hospital.Name variable. The outcomes can
+be one of \heart attack", \heart failure", or \pneumonia". Hospitals that do not have data on a particular
+outcome should be excluded from the set of hospitals when deciding the rankings.
+Handling ties. If there is a tie for the best hospital for a given outcome, then the hospital names should
+be sorted in alphabetical order and the first hospital in that set should be chosen (i.e. if hospitals \b", \c",
+and \f" are tied for best, then hospital \b" should be returned).
+
+
+
+
+
+
+
+Answer:
+```{R}
+#Description of the function
+best <- function(state = character(), outcome = character()) {
+
+     
+#Reading the file
+outcome_data <- read.csv("outcome-of-care-measures.csv", colClasses = "character", na.strings = "Not Available")
+
+
+#I create vector containing valid state and argument names and  from the list. And checking if the arguments iare in the state_names or outcome_names vector.
+state_names <- unique(outcome_data$State)
+if(!(state %in% state_names)) {
+stop("Invalid state name")
+}
+outcome_names <- c("heart attack", "heart failure", "pneumonia")
+if(!(outcome %in% outcome_names)) {
+stop("invalid outcome name")
+}
+
+
+
+#After checking for validty, I subset data. In this subset, only specified state's rows and outcome will be for us.
+sub_data <- outcome_data[outcome_data$State == "state", ]
+obs_data <- na.omit(sub_data[ ,c(2,7,11,17,23)])
+colnames(obs_data) <- c("Hospital Name", "State", "heart attack", "heart failure", "pneumonia")
+
+
+
+#After creating the observation data frame, I need to find the name of the hospital which has lowest death rate in a given state.
+min_row_location <- which.min(obs_data$outcome)
+best_hosp <- outcome_data[min_row_location, "State"]
+return(best_hosp)
+}
+```
+
+
+
+# #Part 3
+
+Question:
+Ranking hospitals by outcome in a state
+Write a function called rankhospital that takes three arguments: the 2-character abbreviated name of a
+state (state), an outcome (outcome), and the ranking of a hospital in that state for that outcome (num).
+The function reads the outcome-of-care-measures.csv file and returns a character vector with the name
+of the hospital that has the ranking specified by the num argument. For example, the call
+rankhospital("MD", "heart failure", 5)
+would return a character vector containing the name of the hospital with the 5th lowest 30-day death rate
+for heart failure. The num argument can take values \best", \worst", or an integer indicating the ranking
+(smaller numbers are better). If the number given by num is larger than the number of hospitals in that
+state, then the function should return NA. Hospitals that do not have data on a particular outcome should
+be excluded from the set of hospitals when deciding the rankings.
+
+
+Answer: 
+```{R}
+#Description of the function
+rankhospital <- function(state = character(), outcome = character(), num = "best") {
+     
+     
+
+#reading the data
+outcome_data <- read.csv("outcome-of-care-measures.csv", colClasses = "character", na.strings = "Not Available")
+
+
+#I create vector containing valid argument names and  from the list. And checking if the arguments are in the outcome_names vector.
+outcome_names <- c("heart attack", "heart failure", "pneumonia")
+if(!(outcome %in% outcome_names)) {
+stop("invalid outcome name")
+}
+
+
+
+#I subset my data.
+sub_data <- outcome_data[outcome_data$State == state, ]
+     
+obs_data <- na.omit(sub_data[ ,c(2,7,11,17,23)])
+     
+colnames(obs_data) <- c("Hospital Name", "State", "heart attack", "heart failure", "pneumonia")
+
+#I write ordered version of my data.
+ obs_data_sorted <- obs_data[order(obs_data[, outcome], obs_data[, "Hospital Name"], decreasing = TRUE), ]
+
+ #Then I create roads to be processed according to the written call.
+     if(num == "best") {
+          best_row_location <- which.min(obs_data[ ,outcome])
+          return(obs_data[best_row_location, "Hospital Name"])
+     }
+     else if(num == "worst") {
+          worst_row_location <- which.max(obs_data[ ,outcome])
+          return(obs_data[worst_row_location, "Hospital Name"])
+     }
+
+       if(is.numeric(num)) {
+         if(num > nrow(obs_data_sorted) || num < 1) {
+           stop("Invalid value for num")
+         } else if(any(duplicated(obs_data_sorted[, outcome])) == FALSE) {
+           num_raw_location <- obs_data_sorted[num, "Hospital Name"]
+           return(num_raw_location)
+         } else {
+           num_raw_location <- obs_data_sorted[which(obs_data_sorted[, outcome] == obs_data_sorted[num, outcome]), "Hospital Name"]
+           return(num_raw_location[length(num_raw_location)])
+         }
+       }
+     }
+```
+
+
+
+
+# #Part 4
+
+
+Question:
+Write a function called rankall that takes two arguments: an outcome name (outcome) and a hospital ranking (num). The function reads the outcome-of-care-measures.csv file and returns a 2-column data frame
+containing the hospital in each state that has the ranking specified in num. For example the function call
+rankall("heart attack", "best") would return a data frame containing the names of the hospitals that
+are the best in their respective states for 30-day heart attack death rates. The function should return a value
+for every state (some may be NA). The first column in the data frame is named hospital, which contains
+the hospital name, and the second column is named state, which contains the 2-character abbreviation for
+the state name. Hospitals that do not have data on a particular outcome should be excluded from the set of
+hospitals when deciding the rankings.
+
+
+
+
+Answer:
+```{R}
+
+rankall <- function(outcome, num = "best") {
+   
+     
+#loading dyplyr package
+library(dplyr)
+
+     
+#Creating empty data frame
+result_df <- NULL
+
+
+#loading data
+outcome_data <- read.csv("outcome-of-care-measures.csv", colClasses = "character", na.strings = "Not Available")
+     
+     
+#I check the validity of the arguments
+outcome_names <- c("heart attack", "heart failure", "pneumonia")
+if(!(outcome %in% outcome_names)) {
+stop("invalid outcome name")
+}    
+
+
+#I name my outcome data with the names I will use
+names(outcome_data)[2] <- "Hospital Name"
+names(outcome_data)[7] <- "State"
+names(outcome_data)[11] <- "heart attack"
+names(outcome_data)[17] <- "heart failure"
+names(outcome_data)[23] <- "pneumonia"
+
+
+#I subset my data
+ sub_data <- outcome_data[, c("Hospital Name", "State", outcome)]
+
+sub_data <- sub_data[!is.na(sub_data[, outcome]), ]
+ 
+
+
+#I convert outcome to numeric
+sub_data[, outcome] <- as.numeric(sub_data[, outcome])
+
+
+
+#Here, I group my subdata according to states. If all unique states listed is a tour then this part of the function will get the "num"th row from each tour. I also accord it to the worst and best arguments.
+sub_data <- group_by(sub_data, State)
+sub_data <- filter(sub_data, !is.na(.data[[outcome]]))
+sub_data <- arrange(sub_data, .data[[outcome]])
+     if(num == "best"){
+          sliced_sub_data <- slice(sub_data, 1)
+          result_df <- as.data.frame(sliced_sub_data)
+          result_df
+     }
+     else if(num == "worst"){
+          sliced_sub_data <- slice(sub_data, length(sub_data))
+          result_df <- as.data.frame(sliced_sub_data)
+          result_df
+     }    
+     else if(1 <= num && num <= n_distinct(sub_data$State)){
+          sliced_sub_data <- slice(sub_data, num)
+          result_df <- as.data.frame(sliced_sub_data)
+          result_df
+     }
+     else{
+          return("Warning, pls enter a valid num")
+     }
+     
+}
+
+```
